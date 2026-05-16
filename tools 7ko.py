@@ -35,15 +35,69 @@ def translate_to_arabic(text):
     except:
         return "حدث خطأ أثناء الترجمة، تأكد من اتصال الإنترنت."
 
+def get_bot_servers(token):
+    print(f"\n{YELLOW}[*] جاري الاتصال بديسكورد وفحص التوكن...{RESET}")
+    
+    guilds_url = "https://discord.com/api/v10/users/@me/guilds"
+    req = urllib.request.Request(guilds_url, headers={'Authorization': f'Bot {token}', 'User-Agent': 'DiscordBot'})
+    
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            guilds = json.loads(response.read().decode('utf-8'))
+            
+            if not guilds:
+                print(f"\n{PINK}![!] البوت شغال، لكنه مو داخل في أي سيرفر حالياً.{RESET}")
+                return
+                
+            print(f"\n{GREEN}✔ تم بنجاح! البوت داخل في ({len(guilds)}) سيرفرات:{RESET}\n")
+            
+            for index, g in enumerate(guilds, 1):
+                guild_id = g['id']
+                guild_name = g['name']
+                print(f"{WHITE}[{index}] السيرفر: {YELLOW}{guild_name}{WHITE} (ID: {guild_id}){RESET}")
+                
+                try:
+                    channels_url = f"https://discord.com/api/v10/guilds/{guild_id}/channels"
+                    c_req = urllib.request.Request(channels_url, headers={'Authorization': f'Bot {token}', 'User-Agent': 'DiscordBot'})
+                    
+                    with urllib.request.urlopen(c_req, timeout=5) as c_res:
+                        channels = json.loads(c_res.read().decode('utf-8'))
+                        
+                        text_channel = None
+                        for ch in channels:
+                            if ch['type'] == 0:
+                                text_channel = ch['id']
+                                break
+                        
+                        if text_channel:
+                            invite_url = f"https://discord.com/api/v10/channels/{text_channel}/invites"
+                            data = json.dumps({"max_age": 86400, "max_uses": 0}).encode('utf-8')
+                            i_req = urllib.request.Request(invite_url, data=data, headers={
+                                'Authorization': f'Bot {token}',
+                                'Content-Type': 'application/json',
+                                'User-Agent': 'DiscordBot'
+                            }, method='POST')
+                            
+                            with urllib.request.urlopen(i_req, timeout=5) as i_res:
+                                invite_data = json.loads(i_res.read().decode('utf-8'))
+                                print(f"    🔗 رابط الدعوة: {GREEN}https://discord.gg/{invite_data['code']}{RESET}")
+                        else:
+                            print(f"    🔗 رابط الدعوة: {PINK}لم يتم العثور على روم كتابي متاح{RESET}")
+                except:
+                    print(f"    🔗 رابط الدعوة: {PINK}صلاحيات البوت لا تسمح بصنع رابط في هذا السيرفر{RESET}")
+                print("-" * 40)
+                
+    except Exception as e:
+        print(f"\n{PINK}❌ خطأ: التوكن غير صحيح أو انتهت صلاحيته.{RESET}")
+
 def main_menu():
     clear_screen()
     show_logo()
     
     print(f"{GREEN}~ [1] IP Address & Ports Tool{RESET}")
-    print("\n")
     print(f"       {BLUE}~ [2] Translation Tool (EN -> AR){RESET}")
-    print("\n")
     print(f"                                    {PINK}~ [3] Discord Users Tool{RESET}")
+    print(f"                                    {YELLOW}~ [4] Discord Bot Tool{RESET}")
     print("\n" + "="*50)
     print(f"{YELLOW} [0] Exit / خروج{RESET}")
     print("="*50)
@@ -74,11 +128,19 @@ def main_menu():
         for u in users:
             print(f" {WHITE}•{RESET} {PINK}{u}{RESET}")
             
+    elif choice == '4':
+        print(f"\n{YELLOW}[+] أداة فحص سيرفرات البوت والروابط{RESET}")
+        bot_token = input(f"{WHITE}◀ أدخل توكن البوت (Bot Token): {RESET}").strip()
+        if bot_token:
+            get_bot_servers(bot_token)
+        else:
+            print(f"\n{PINK}❌ لم تقم بكتابة التوكن!{RESET}")
+            
     elif choice == '0':
         print(f"\n{YELLOW}في أمان الله يا حكو! تم الخروج.{RESET}\n")
         sys.exit()
     else:
-        print(f"\n{PINK}❌ اختيار غير صحيح، الرجاء اختيار 1 أو 2 أو 3{RESET}")
+        print(f"\n{PINK}❌ اختيار غير صحيح، الرجاء اختيار رقم متاح في القائمة{RESET}")
         
     input(f"\n{WHITE}اضغط Enter للعودة إلى القائمة الرئيسية...{RESET}")
     main_menu()
