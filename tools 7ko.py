@@ -3,6 +3,7 @@ import sys
 import socket
 import urllib.request
 import urllib.parse
+import urllib.error
 import json
 import string
 import random
@@ -21,12 +22,13 @@ YELLOW = '\033[1;33m'
 RED = '\033[1;31m'
 RESET = '\033[0m'
 
-# ====== متغيرات عامة للخيار الخامس ======
+# متغيرات عامة للخيار 5
 FOUND_COUNT = 0
 CHECKED_COUNT = 0
 LOCK = threading.Lock()
 STOP_FLAG = False
 WEBHOOK_URL = ""
+START_TIME = 0
 
 def show_logo():
     print(f"{WHITE}")
@@ -103,13 +105,13 @@ def get_bot_servers(token):
     except Exception as e:
         print(f"\n{PINK}❌ خطأ: التوكن غير صحيح أو انتهت صلاحيته.{RESET}")
 
-# ===================== خيار 5: فحص يوزرات تيك توك رباعية =====================
+# ========== خيار 5: فحص يوزرات تيك توك رباعية ==========
 
 def send_to_discord(username):
-    """إرسال اليوزر الصحيح للويبهوك"""
+    """إرسال اليوزر الصحيح للويبهوك فقط"""
     global WEBHOOK_URL
     data = {
-        "content": f"@everyone ✅ تم العثور على يوزر تيك توك رباعي صحيح:\n**@{username}**\nhttps://www.tiktok.com/@{username}"
+        "content": f"@everyone ✅ **تم العثور على يوزر تيك توك رباعي صحيح!**\n**@{username}**\nhttps://www.tiktok.com/@{username}"
     }
     req = urllib.request.Request(
         WEBHOOK_URL,
@@ -124,7 +126,7 @@ def send_to_discord(username):
         return False
 
 def check_tiktok_user(username):
-    """فحص إذا كان يوزر تيك توك موجود أو لا"""
+    """فحص إذا اليوزر موجود على تيك توك"""
     url = f"https://www.tiktok.com/@{username}"
     req = urllib.request.Request(url, headers={
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -134,21 +136,16 @@ def check_tiktok_user(username):
     })
     try:
         resp = urllib.request.urlopen(req, timeout=4)
-        # إذا جاب 200 معناه اليوزر موجود
         if resp.getcode() == 200:
-            # نتأكد أكثر: نشوف إذا الصفحة تقول "Page not found" أو لا
             html = resp.read().decode('utf-8', errors='ignore')
             if 'Page Not Found' in html or 'page not found' in html or 'could not be found' in html:
                 return False
             return True
         return False
     except urllib.error.HTTPError as e:
-        # 404 = غير موجود ، 403 = موجود غالباً (ممنوع لكن الحساب موجود)
         if e.code == 404:
             return False
-        elif e.code == 403 or e.code == 302 or e.code == 301:
-            # 403 معناه الحساب موجود لكن محظور أو خاص
-            # 302/301 إعادة توجيه = موجود
+        elif e.code in (403, 302, 301):
             return True
         return False
     except:
@@ -160,7 +157,7 @@ def generate_username():
     return ''.join(random.choices(chars, k=4))
 
 def worker(thread_id):
-    """دالة كل ثريد يعملها"""
+    """دالة الشغالة - كل ثريد"""
     global FOUND_COUNT, CHECKED_COUNT, STOP_FLAG
     
     while not STOP_FLAG:
@@ -169,13 +166,15 @@ def worker(thread_id):
         with LOCK:
             CHECKED_COUNT += 1
             current_checked = CHECKED_COUNT
-            current_found = FOUND_COUNT
         
-        # شاشة عرض سريعة
-        if current_checked % 10 == 0:
-            print(f"\r{YELLOW}[*] تم الفحص: {current_checked} | تم العثور: {GREEN}{current_found}{RESET}    ", end="", flush=True)
+        # عرض تقدم كل 20 فحص
+        if current_checked % 20 == 0:
+            with LOCK:
+                cf = FOUND_COUNT
+            elapsed = max(int(time.time() - START_TIME), 1)
+            print(f"\r{YELLOW}[*] فحص: {current_checked} | وجد: {GREEN}{cf}{RESET} | سرعة: {WHITE}{current_checked // elapsed}/ث{RESET}  ", end="", flush=True)
         
-        # فحص اليوزر
+        # الفحص الفعلي
         exists = check_tiktok_user(username)
         
         if exists:
@@ -183,23 +182,22 @@ def worker(thread_id):
                 FOUND_COUNT += 1
                 current_found = FOUND_COUNT
             
-            # إرسال للويبهوك
+            # إرسال للويبهوك فقط الصحيح
             success = send_to_discord(username)
-            
             symbol = "✅" if success else "⚠️"
-            print(f"\n{GREEN}{symbol} [يوزر رباعي صحيح] @{username} -> تم الإرسال للويبهوك! (إجمالي: {current_found}){RESET}")
+            print(f"\n{GREEN}{symbol} [موجود] @{username} -> تم الإرسال! (#{current_found}){RESET}")
         
-        # وقفة خفيفة عشان لا نثقل على السيرفر
-        time.sleep(0.05)
+        # وقفة خفيفة جداً
+        time.sleep(0.03)
 
 def tiktok_username_tool():
-    """الخيار الخامس - أداة فحص يوزرات تيك توك الرباعية"""
-    global WEBHOOK_URL, FOUND_COUNT, CHECKED_COUNT, STOP_FLAG
+    """الخيار الخامس - الأداة الرئيسية"""
+    global WEBHOOK_URL, FOUND_COUNT, CHECKED_COUNT, STOP_FLAG, START_TIME
     
-    # تصفير المتغيرات
     FOUND_COUNT = 0
     CHECKED_COUNT = 0
     STOP_FLAG = False
+    START_TIME = time.time()
     
     clear_screen()
     show_logo()
@@ -212,15 +210,13 @@ def tiktok_username_tool():
     WEBHOOK_URL = input(f"{WHITE}◀ أدخل رابط Webhook الديسكورد: {RESET}").strip()
     
     if not WEBHOOK_URL.startswith("https://discord.com/api/webhooks/"):
-        print(f"\n{RED}❌ رابط ويبهوك غير صحيح! تأكد من الرابط.{RESET}")
+        print(f"\n{RED}❌ رابط ويبهوك غير صحيح!{RESET}")
         input(f"\n{WHITE}اضغط Enter للعودة...{RESET}")
         return
     
     # اختبار الويبهوك
     print(f"\n{YELLOW}[*] جاري اختبار الويبهوك...{RESET}")
-    test_data = {
-        "content": "🚀 **تم تشغيل أداة فحص يوزرات تيك توك الرباعية!**\n✅ جاري البحث عن يوزرات رباعية..."
-    }
+    test_data = {"content": "🚀 **تم تشغيل فحص يوزرات تيك توك الرباعية!** جاري البحث..."}
     try:
         req = urllib.request.Request(
             WEBHOOK_URL,
@@ -231,18 +227,18 @@ def tiktok_username_tool():
         urllib.request.urlopen(req, timeout=5)
         print(f"{GREEN}✔ الويبهوك شغال 100%!{RESET}")
     except:
-        print(f"{RED}❌ فشل الاتصال بالويبهوك، تحقق من الرابط.{RESET}")
+        print(f"{RED}❌ فشل الاتصال بالويبهوك!{RESET}")
         input(f"\n{WHITE}اضغط Enter للعودة...{RESET}")
         return
     
     # اختيار عدد الثريدات
-    print(f"\n{WHITE}عدد الثريدات (السرعة):{RESET}")
-    print(f"{GREEN}  [1] {RESET}هادئ - 5 ثريدات")
-    print(f"{GREEN}  [2] {RESET}سريع - 15 ثريد")
-    print(f"{GREEN}  [3] {RESET}سوبر - 30 ثريد {YELLOW}(يوصى به){RESET}")
-    print(f"{GREEN}  [4] {RESET}أسطوري - 50 ثريد {RED}(قد يحظر){RESET}")
+    print(f"\n{WHITE}اختر السرعة:{RESET}")
+    print(f"  {GREEN}[1]{RESET} هادئ - 5 ثريدات")
+    print(f"  {GREEN}[2]{RESET} سريع - 15 ثريد")
+    print(f"  {GREEN}[3]{RESET} سوبر - 30 ثريد {YELLOW}(ممتاز){RESET}")
+    print(f"  {GREEN}[4]{RESET} أسطوري - 50 ثريد {RED}(قد يحظر){RESET}")
     
-    speed = input(f"\n{WHITE}◀ اختر السرعة (1-4) [افتراضي 3]: {RESET}").strip()
+    speed = input(f"\n{WHITE}◀ اختر (1-4) [افتراضي 3]: {RESET}").strip()
     speed_map = {'1': 5, '2': 15, '3': 30, '4': 50}
     num_threads = speed_map.get(speed, 30)
     
@@ -252,10 +248,9 @@ def tiktok_username_tool():
     print(f"\n{GREEN}══════════════════════════════════════════{RESET}")
     print(f"{GREEN}   🔍 الأداة شغالة! 🔍{RESET}")
     print(f"{GREEN}══════════════════════════════════════════{RESET}")
-    print(f"{WHITE}  • عدد الثريدات: {YELLOW}{num_threads}{RESET}")
-    print(f"{WHITE}  • اليوزرات الصحيحة تُرسل للويبهوك{RESET}")
-    print(f"{WHITE}  • الغلط يتجاهل ولا يرسل شيء{RESET}")
-    print(f"{WHITE}  • اضغط {RED}Ctrl+C{RESET} {WHITE}لإيقاف الأداة{RESET}")
+    print(f"{WHITE}  • ثريدات: {YELLOW}{num_threads}{RESET}")
+    print(f"{WHITE}  • الصحيح → ويبهوك | الغلط → يتجاهل{RESET}")
+    print(f"{WHITE}  • اوقف بـ {RED}Ctrl+C{RESET}")
     print(f"{GREEN}══════════════════════════════════════════\n{RESET}")
     
     # تشغيل الثريدات
@@ -265,23 +260,23 @@ def tiktok_username_tool():
         t.start()
         threads.append(t)
     
-    # مراقبة لوحة الإحصائيات
+    # الحلقة الرئيسية
     try:
         while True:
-            time.sleep(2)
-            with LOCK:
-                print(f"\r{YELLOW}[*] تم الفحص: {CHECKED_COUNT} | تم العثور: {GREEN}{FOUND_COUNT}{RESET} | {WHITE}يوزر/ثانية: {YELLOW}{CHECKED_COUNT // max(int(time.time() - start_time), 1)}{RESET}    ", end="", flush=True)
+            time.sleep(3)
     except KeyboardInterrupt:
         STOP_FLAG = True
-        print(f"\n\n{YELLOW}⏹ تم إيقاف الأداة!{RESET}")
-        print(f"{GREEN}📊 الإحصائيات النهائية:{RESET}")
-        print(f"{WHITE}  • إجمالي الفحص: {YELLOW}{CHECKED_COUNT}{RESET}")
-        print(f"{WHITE}  • يوزرات صحيحة: {GREEN}{FOUND_COUNT}{RESET}")
-        print(f"{WHITE}  • تم إرسال الكل للويبهوك ✅{RESET}")
+        elapsed = int(time.time() - START_TIME)
+        print(f"\n\n{YELLOW}⏹ تم الإيقاف!{RESET}")
+        print(f"{GREEN}📊 الإحصائيات:{RESET}")
+        print(f"  • إجمالي الفحص: {WHITE}{CHECKED_COUNT}{RESET}")
+        print(f"  • يوزرات صحيحة: {GREEN}{FOUND_COUNT}{RESET}")
+        print(f"  • الوقت: {WHITE}{elapsed} ثانية{RESET}")
+        print(f"  • السرعة: {WHITE}{CHECKED_COUNT // max(elapsed, 1)} يوزر/ثانية{RESET}")
     
-    input(f"\n{WHITE}اضغط Enter للعودة للقائمة...{RESET}")
+    input(f"\n{WHITE}اضغط Enter للعودة...{RESET}")
 
-# ===================== القائمة الرئيسية =====================
+# ========== القائمة الرئيسية ==========
 
 def main_menu():
     clear_screen()
@@ -291,39 +286,44 @@ def main_menu():
     print(f"       {BLUE}~ [2] Translation Tool (EN -> AR){RESET}")
     print(f"                                    {PINK}~ [3] Discord Users Tool{RESET}")
     print(f"                                    {YELLOW}~ [4] Discord Bot Tool{RESET}")
-    print(f"                                    {RED}~ [5] TikTok 4-Char Username Checker 🔥{RESET}")
+    print(f"                                    {RED}~ [5] TikTok 4-Char Username 🔥{RESET}")
     print("\n" + "="*50)
-    print(f"{YELLOW} [0] Exit / خروج{RESET}")
+    print(f"{YELLOW} [0] Exit{RESET}")
     print("="*50)
     
-    choice = input(f"\n{WHITE}◀ اختر رقم الأداة التي تبيها: {RESET}").strip()
+    choice = input(f"\n{WHITE}◀ اختر رقم: {RESET}").strip()
     
     if choice == '1':
-        print(f"\n{GREEN}[+] أداة استخراج IP وبورتات الموقع{RESET}")
-        domain = input(f"{WHITE}◀ أدخل رابط الموقع بدون www (مثال: google.com): {RESET}").strip()
+        print(f"\n{GREEN}[+] IP & Ports{RESET}")
+        domain = input(f"{WHITE}◀ domain: {RESET}").strip()
         try:
-            ip_address = socket.gethostbyname(domain)
-            print(f"\n{GREEN}✔ IP Address للموقع هو: {YELLOW}{ip_address}{RESET}")
-            print(f"{GREEN}✔ البورتات المفتوحة الافتراضية للويب: {RESET}")
-            print(f"   - Port 80 (HTTP)  -> {GREEN}متاح لفحص الاتصال{RESET}")
-            print(f"   - Port 443 (HTTPS) -> {GREEN}متاح لتأمين البيانات{RESET}")
+            ip = socket.gethostbyname(domain)
+            print(f"\n{GREEN}✔ IP: {YELLOW}{ip}{RESET}")
+            print(f"{GREEN}✔ Ports: 80 (HTTP), 443 (HTTPS){RESET}")
         except socket.gaierror:
-            print(f"\n{PINK}❌ خطأ: لم يتم العثور على الموقع، تأكد من كتابة الرابط بشكل صحيح بدون http أو www.{RESET}")
-            
+            print(f"\n{PINK}❌ خطأ في اسم النطاق{RESET}")
     elif choice == '2':
-        print(f"\n{BLUE}[+] أداة الترجمة الفورية{RESET}")
-        word = input(f"{WHITE}◀ اكتب الكلمة بالإنجليزية لترجمتها للعربية: {RESET}").strip()
-        result = translate_to_arabic(word)
-        print(f"\n{BLUE}✔ الترجمة بالعربي هي: {YELLOW}{result}{RESET}")
-        
+        print(f"\n{BLUE}[+] Translation{RESET}")
+        word = input(f"{WHITE}◀ EN: {RESET}").strip()
+        print(f"\n{GREEN}AR: {YELLOW}{translate_to_arabic(word)}{RESET}")
     elif choice == '3':
-        print(f"\n{PINK}[+] يوزرات ديسكورد رباعية المطلوبة:{RESET}\n")
-        users = ["6j5w", "8vgu", "8vgd", "8vgq"]
-        for u in users:
-            print(f" {WHITE}•{RESET} {PINK}{u}{RESET}")
-            
+        print(f"\n{PINK}[+] Discord users:{RESET}\n")
+        for u in ["6j5w", "8vgu", "8vgd", "8vgq"]:
+            print(f"  {PINK}• {u}{RESET}")
     elif choice == '4':
-        print(f"\n{YELLOW}[+] أداة فحص سيرفرات البوت والروابط{RESET}")
-        bot_token = input(f"{WHITE}◀ أدخل توكن البوت (Bot Token): {RESET}").strip()
-        if bot_token:
-            get_bot_servers(b
+        print(f"\n{YELLOW}[+] Bot Tool{RESET}")
+        token = input(f"{WHITE}◀ Bot token: {RESET}").strip()
+        if token: get_bot_servers(token)
+        else: print(f"{PINK}❌ لا يوجد توكن{RESET}")
+    elif choice == '5':
+        tiktok_username_tool()
+    elif choice == '0':
+        print(f"\n{YELLOW}الله معاك!{RESET}\n"); sys.exit()
+    else:
+        print(f"\n{PINK}❌ رقم خطأ{RESET}")
+    
+    input(f"\n{WHITE}اضغط Enter...{RESET}")
+    main_menu()
+
+if __name__ == "__main__":
+    main_menu()
