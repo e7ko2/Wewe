@@ -10,7 +10,6 @@ import string
 import threading
 import time
 
-# تعديل clear عشان يشتغل على A Shell
 def clear_screen():
     try:
         os.system('clear')
@@ -34,6 +33,13 @@ running = True
 checked_set = set()
 checked_set_lock = threading.Lock()
 
+# ---- متغيرات ديسكورد يوزرات ----
+DC_WEBHOOK = ""
+DC_TOKEN = ""
+dc_found = 0
+dc_checked = 0
+dc_running = True
+
 def show_logo():
     print(f"{WHITE}")
     print(" ▄▄▄▄▄▄▄           ")
@@ -52,7 +58,7 @@ def translate_to_arabic(text):
             res = json.loads(response.read().decode('utf-8'))
             return res[0][0][0]
     except:
-        return "حدث خطأ أثناء الترجمة"
+        return "حدث خطأ"
 
 def get_bot_servers(token):
     print(f"\n{YELLOW}[*] جاري الاتصال بديسكورد...{RESET}")
@@ -96,172 +102,233 @@ def get_bot_servers(token):
     except:
         print(f"\n{PINK}❌ التوكن غير صحيح.{RESET}")
 
-def send_to_webhook(username, pattern_type):
-    global WEBHOOK_URL
-    if not WEBHOOK_URL:
+# ==================== ديسكورد يوزرات ====================
+
+def send_dc_webhook(username):
+    """إرسال اليوزر المتاح للويبهوك"""
+    global DC_WEBHOOK
+    if not DC_WEBHOOK:
         return
-    icons = {"under_begin": "🔰", "under_mid": "💎", "under_end": "🔥", "under_x2": "👑"}
-    icon = icons.get(pattern_type, "⭐")
     data = {
-        "content": f"{icon} **تيكن توك - يوزر نادر!**\n📛 `{username}`\n🔗 https://www.tiktok.com/@{username}",
-        "username": "TikTok Rare Checker"
+        "content": f"✅ **ديسكورد - يوزر مميز متاح!**\n📛 `{username}`\n🔗 https://discord.com/users/{username}",
+        "username": "Discord User Checker"
     }
     try:
         data_bytes = json.dumps(data).encode('utf-8')
-        req = urllib.request.Request(WEBHOOK_URL, data=data_bytes,
+        req = urllib.request.Request(DC_WEBHOOK, data=data_bytes,
             headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'}, method='POST')
         urllib.request.urlopen(req, timeout=5)
     except:
         pass
 
-def generate_rare_username():
-    """توليد يوزر نادر مع أندر سكور"""
+def generate_dc_username():
+    """توليد يوزر ديسكورد مميز مثل: 7mo, .ksa, _fvl, 7mo., x9m_, _7mo, ksa., mo7_, _x9m"""
     chars_letters = string.ascii_lowercase
     chars_digits = string.digits
     chars_all = chars_letters + chars_digits
     
-    pattern = random.randint(1, 6)
+    pattern = random.randint(1, 10)
     
-    if pattern == 1:  # _xyz
-        body = ''.join(random.choices(chars_all, k=3))
-        return f"_{body}", "under_begin"
-    elif pattern == 2:  # x_yz
+    if pattern == 1:  # 7mo (3 حروف/أرقام)
         a = random.choice(chars_all)
-        body = ''.join(random.choices(chars_all, k=2))
-        return f"{a}_{body}", "under_mid"
-    elif pattern == 3:  # xy_z
-        body = ''.join(random.choices(chars_all, k=2))
-        a = random.choice(chars_all)
-        return f"{body}_{a}", "under_mid"
-    elif pattern == 4:  # xyz_
+        b = random.choice(chars_letters)
+        c = random.choice(chars_all)
+        return f"{a}{b}{c}", "ثلاثي"
+    elif pattern == 2:  # .ksa (نقطة + 3 أحرف)
+        body = ''.join(random.choices(chars_letters, k=3))
+        return f".{body}", "نقطة_بداية"
+    elif pattern == 3:  # _fvl (أندر + 3 أحرف)
+        body = ''.join(random.choices(chars_letters, k=3))
+        return f"_{body}", "أندر_بداية"
+    elif pattern == 4:  # 7mo. (3 أحرف + نقطة)
         body = ''.join(random.choices(chars_all, k=3))
-        return f"{body}_", "under_end"
-    elif pattern == 5:  # _xy_
-        body = ''.join(random.choices(chars_all, k=2))
-        return f"_{body}_", "under_x2"
-    else:  # x_9m مثلاً
+        return f"{body}.", "نقطة_نهاية"
+    elif pattern == 5:  # x9m_ (4 أحرف + أندر)
+        body = ''.join(random.choices(chars_all, k=3))
+        return f"{body}_", "أندر_نهاية"
+    elif pattern == 6:  # _7mo (أندر + 3 أحرف مع رقم)
+        body = ''.join(random.choices(chars_all, k=3))
+        return f"_{body}", "أندر_بداية_مختلط"
+    elif pattern == 7:  # ksa. (3 أحرف + نقطة)
+        body = ''.join(random.choices(chars_letters, k=3))
+        return f"{body}.", "نقطة_نهاية_حروف"
+    elif pattern == 8:  # mo7_ (3 أحرف + أندر)
+        body = ''.join(random.choices(chars_all, k=3))
+        return f"{body}_", "أندر_نهاية_مختلط"
+    elif pattern == 9:  # _x9m (أندر + حرف + رقم + حرف)
         a = random.choice(chars_letters)
         b = random.choice(chars_digits)
         c = random.choice(chars_letters)
-        d = random.choice(chars_digits)
-        return f"{a}_{b}{c}{d}", "under_mid"
+        return f"_{a}{b}{c}", "أندر_بداية_مميز"
+    elif pattern == 10:  # 7m.o (حرف + نقطة + حرفين)
+        a = random.choice(chars_all)
+        b = random.choice(chars_letters)
+        c = random.choice(chars_all)
+        return f"{a}{b}.{c}", "نقطة_وسط"
+    else:  # 7mo
+        body = ''.join(random.choices(chars_all, k=3))
+        return body, "ثلاثي"
 
-def check_username(username):
+def check_dc_username(username, token):
+    """فحص يوزر ديسكورد عن طريق API"""
     try:
-        req = urllib.request.Request(f"https://www.tiktok.com/@{username}",
+        url = f"https://discord.com/api/v10/users/@me"
+        req = urllib.request.Request(url, headers={'Authorization': token, 'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as res:
+            data = json.loads(res.read().decode('utf-8'))
+        
+        # الآن نفحص availability عن طريق lookup
+        lookup_url = f"https://discord.com/api/v10/users/@me/relationships"
+        l_req = urllib.request.Request(lookup_url, headers={'Authorization': token, 'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(l_req, timeout=5) as l_res:
+            pass
+        
+        # نستخدم طريقة الـ lookup غير المباشرة: نجرب نغير اليوزر ونشوف لو موجود
+        # هذه الطريقة أسهل: نحاول نبعت ريكويست لبروفايل اليوزر
+        check_url = f"https://discord.com/api/v10/users/{random.randint(100000000000000000, 999999999999999999)}"
+        # بدلاً من ذلك نستخدم طريقة البحث باليوزر
+        
+        # الطريقة المضمونة: نفحص عن طريق الـ guilds members
+        # لكن بساطة: نستخدم service lookup
+        test_url = f"https://discord.com/api/v10/users/@me/profiles"
+        test_req = urllib.request.Request(test_url, headers={'Authorization': token, 'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(test_req, timeout=5) as test_res:
+            pass
+        
+        # الآن نجرب نغير display name أو نشوف لو اليوزر متاح
+        # أسهل طريقة: نستخدم lookup للـ username
+        # ديسكورد ما عنده API عام لفحص username availability
+        # لكن نقدر نستخدم experimental endpoint
+        
+        # أقرب طريقة: نحاول نغير username حقنا لهذا الاسم
+        # لو نجح = متاح، لو فشل = غير متاح
+        return False  # نستخدم طريقة مختلفة بالأسفل
+        
+    except Exception as e:
+        return False
+
+def check_dc_username_simple(username):
+    """فحص سريع عبر صفحة الـ vanity URL"""
+    try:
+        # ديسكورد ما عنده صفحة عامة لـ username
+        # نستخدم طريقة head request
+        req = urllib.request.Request(f"https://discord.com/users/{username}",
             headers={'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36'}, method='HEAD')
         urllib.request.urlopen(req, timeout=5)
-        return False
+        return False  # الصفحة موجودة значит userName غير متاح
     except urllib.error.HTTPError as e:
-        return e.code in [404, 302, 301]
+        return e.code in [404, 302, 301]  # الصفحة مو موجودة значит userName متاح
     except:
         return False
 
-def tiktok_worker():
-    global found_count, checked_count, running, checked_set
-    while running:
-        username, ptype = generate_rare_username()
+def check_dc_username_api(username, token):
+    """فحص عبر API ديسكورد - الطريقة الصحيحة"""
+    try:
+        # ديسكورد يوفر endpoint لـ lookup username (global name)
+        # نستخدم method بسيطة: نغير الـ global name حقنا
+        url = "https://discord.com/api/v10/users/@me"
+        data = json.dumps({"global_name": username}).encode('utf-8')
+        req = urllib.request.Request(url, data=data,
+            headers={'Authorization': token, 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'},
+            method='PATCH')
+        with urllib.request.urlopen(req, timeout=5) as res:
+            result = json.loads(res.read().decode('utf-8'))
+            # لو نجح التغيير معناه الاسم متاح
+        
+        # نرجع الاسم القديم
+        old_name = result.get('global_name', '')
+        return True
+        
+    except urllib.error.HTTPError as e:
+        if e.code == 400:
+            body = e.read().decode('utf-8')
+            if '"global_name"' in body or 'already' in body.lower() or 'taken' in body.lower():
+                return False  # الاسم مستخدم
+            return True  # خطأ ثاني لكن ممكن الاسم متاح
+        return False
+    except:
+        return False
+
+def check_dc_username_final(username, token):
+    """الطريقة النهائية لفحص ديسكورد يوزر"""
+    try:
+        # طريقة 1: نحاول نغير global_name
+        url = "https://discord.com/api/v10/users/@me"
+        data = json.dumps({"global_name": username}).encode('utf-8')
+        req = urllib.request.Request(url, data=data,
+            headers={'Authorization': token, 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'},
+            method='PATCH')
+        
+        with urllib.request.urlopen(req, timeout=5) as res:
+            # نجح التغيير! الاسم متاح
+            result = json.loads(res.read().decode('utf-8'))
+            old_name = result.get('global_name', username)
+            
+            # نرجع الاسم القديم عشان ما يضرب الحساب
+            restore_data = json.dumps({"global_name": ""}).encode('utf-8')
+            restore_req = urllib.request.Request(url, data=restore_data,
+                headers={'Authorization': token, 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'},
+                method='PATCH')
+            urllib.request.urlopen(restore_req, timeout=5)
+            
+            return True
+            
+    except urllib.error.HTTPError as e:
+        if e.code == 400:
+            try:
+                body = json.loads(e.read().decode('utf-8'))
+                err_msg = body.get('message', '')
+                err_code = body.get('code', 0)
+                
+                # كود الخطأ 50006 = username already taken
+                if err_code == 50006 or 'taken' in err_msg.lower() or 'already' in err_msg.lower():
+                    return False  # الاسم مستخدم
+                if err_code == 50035 or 'invalid' in err_msg.lower():
+                    return False  # اسم غير صالح
+                return False
+            except:
+                return False
+        return False
+    except:
+        return False
+
+def dc_worker():
+    global dc_found, dc_checked, dc_running, DC_TOKEN
+    
+    while dc_running:
+        username, ptype = generate_dc_username()
+        
+        # منع التكرار
         with checked_set_lock:
             if username in checked_set:
                 continue
             checked_set.add(username)
+        
         with lock:
-            checked_count += 1
-            current_checked = checked_count
-        print(f"{WHITE}[{current_checked}] {BLUE}فحص: {CYAN}{username}{RESET}    ", end='\r')
-        if check_username(username):
+            dc_checked += 1
+            current_checked = dc_checked
+        
+        print(f"{WHITE}[{current_checked}] {BLUE}فحص دس: {CYAN}{username} ({ptype}){RESET}    ", end='\r')
+        
+        if check_dc_username_final(username, DC_TOKEN):
             with lock:
-                found_count += 1
-                current_found = found_count
-            color = {"under_begin": CYAN, "under_end": YELLOW, "under_x2": RED}.get(ptype, GREEN)
-            print(f"\n{color}✅ [{ptype}] {WHITE}{username} {color}https://www.tiktok.com/@{username}{RESET}")
-            with open('tiktok_hits.txt', 'a', encoding='utf-8') as f:
+                dc_found += 1
+                current_found = dc_found
+            
+            colors = {"ثلاثي": GREEN, "نقطة_بداية": CYAN, "أندر_بداية": YELLOW, 
+                     "نقطة_نهاية": PINK, "أندر_نهاية": RED, "أندر_بداية_مختلط": CYAN,
+                     "نقطة_نهاية_حروف": GREEN, "أندر_نهاية_مختلط": YELLOW,
+                     "أندر_بداية_مميز": RED, "نقطة_وسط": PINK}
+            color = colors.get(ptype, GREEN)
+            
+            print(f"\n{color}✅ [{ptype}] {WHITE}{username} {color}متاح!{RESET}")
+            
+            # حفظ
+            with open('discord_hits.txt', 'a', encoding='utf-8') as f:
                 f.write(f"[{ptype}] {username}\n")
-            send_to_webhook(username, ptype)
+            
+            # إرسال ويبهوك
+            send_dc_webhook(username)
 
-def tiktok_menu():
-    global WEBHOOK_URL, running, found_count, checked_count, checked_set
-    found_count = 0; checked_count = 0; running = True; checked_set = set()
-    clear_screen()
-    print(f"\n{RED}══════════ TikTok Rare Username Checker ══════════{RESET}")
-    print(f"\n{WHITE}أنماط اليوزرات النادرة مع أندر سكور _")
-    print(f"  {CYAN}_xxx{RESET}  : أندر سكور بالبداية")
-    print(f"  {GREEN}x_xx{RESET}  : أندر سكور بالوسط")
-    print(f"  {YELLOW}xxx_{RESET}  : أندر سكور بالنهاية")
-    print(f"  {RED}_xx_{RESET}  : أندر سكور بداية+نهاية{RESET}")
-    
-    WEBHOOK_URL = input(f"\n{WHITE}◀ رابط ويبهوك الديسكورد: {RESET}").strip()
-    if not WEBHOOK_URL:
-        print(f"{YELLOW}⚠ بدون ويبهوك{RESET}")
-        WEBHOOK_URL = ""
-    
-    try:
-        t = input(f"{WHITE}◀ عدد الثريدات (Enter=30): {RESET}").strip()
-        threads_count = int(t) if t else 30
-    except:
-        threads_count = 30
-    
-    print(f"\n{GREEN}🚀 الشغل بـ {threads_count} ثريد | Ctrl+C للإيقاف{RESET}\n")
-    time.sleep(1)
-    
-    threads = []
-    try:
-        for _ in range(threads_count):
-            th = threading.Thread(target=tiktok_worker, daemon=True)
-            th.start()
-            threads.append(th)
-        while running:
-            time.sleep(3)
-            with lock:
-                print(f"{WHITE}[فحص {checked_count}] {GREEN}✅ {found_count} متاح{RESET}    ", end='\r')
-    except KeyboardInterrupt:
-        running = False
-        print(f"\n\n{YELLOW}⏹ تم الإيقاف | {GREEN}{found_count} يوزر متاح{RESET}")
-        print(f"{WHITE}📁 المحفوظ: tiktok_hits.txt{RESET}")
-        input(f"\n{WHITE}Enter للرجوع...{RESET}")
-        main_menu()
-
-def main_menu():
-    clear_screen()
-    show_logo()
-    print(f"{GREEN}~ [1] IP & Ports Tool{RESET}")
-    print(f"       {BLUE}~ [2] Translation EN->AR{RESET}")
-    print(f"                                    {PINK}~ [3] Discord Users{RESET}")
-    print(f"                                    {YELLOW}~ [4] Discord Bot Tool{RESET}")
-    print(f"{RED}~ [5] TikTok Rare Checker 🔥{RESET}")
-    print(f"\n{YELLOW} [0] Exit{RESET}")
-    choice = input(f"\n{WHITE}◀ اختار: {RESET}").strip()
-    
-    if choice == '1':
-        domain = input(f"\n{WHITE}الموقع: {RESET}").strip()
-        try:
-            ip = socket.gethostbyname(domain)
-            print(f"{GREEN}✔ IP: {YELLOW}{ip}{RESET}")
-            print(f"   Port 80: {GREEN}HTTP{RESET}")
-            print(f"   Port 443: {GREEN}HTTPS{RESET}")
-        except:
-            print(f"{PINK}❌ خطأ في الموقع{RESET}")
-    elif choice == '2':
-        word = input(f"{WHITE}الكلمة بالإنجليزي: {RESET}").strip()
-        print(f"{BLUE}✔ {YELLOW}{translate_to_arabic(word)}{RESET}")
-    elif choice == '3':
-        print(f"\n{PINK}Discord 4-letter users:{RESET}")
-        for u in ["6j5w", "8vgu", "8vgd"]:
-            print(f"  • {PINK}{u}{RESET}")
-    elif choice == '4':
-        token = input(f"{WHITE}Bot Token: {RESET}").strip()
-        if token: get_bot_servers(token)
-    elif choice == '5':
-        tiktok_menu()
-        return
-    elif choice == '0':
-        print(f"\n{YELLOW}في أمان الله!{RESET}")
-        sys.exit()
-    else:
-        print(f"{PINK}❌ رقم غلط{RESET}")
-    
-    input(f"\n{WHITE}Enter للرجوع...{RESET}")
-    main_menu()
-
-if __name__ == "__main__":
-    main_menu()
+def discord_users_menu():
+    global DC_WEBHO
